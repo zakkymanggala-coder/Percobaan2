@@ -3,23 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f3f5ef">
-  <title>Langit | Monitoring Cuaca</title>
+  <meta name="theme-color" content="#eaf5fc">
+  <title>Monitoring Cuaca</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <style>
     :root {
       color-scheme: light;
-      --ink: #17231d;
-      --muted: #718078;
-      --line: #e2e8e1;
-      --paper: #fbfcf8;
-      --canvas: #f1f4ee;
-      --green: #244a38;
-      --green-dark: #183629;
-      --lime: #d9ef8a;
+      --ink: #132d43;
+      --muted: #648198;
+      --line: rgba(111, 163, 197, .28);
+      --paper: rgba(255, 255, 255, .66);
+      --canvas: #eaf5fc;
+      --green: #176a9f;
+      --green-dark: #10547f;
+      --lime: #b9e8ff;
       --orange: #e89053;
-      --blue: #dcebf0;
-      --shadow: 0 18px 50px rgba(36, 57, 43, .07);
-      font-family: "Aptos", "Segoe UI", sans-serif;
+      --blue: #d8effb;
+      --shadow: 0 18px 50px rgba(42, 91, 126, .1);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-synthesis: none;
     }
     * { box-sizing: border-box; }
@@ -28,35 +29,61 @@
       min-width: 320px;
       color: var(--ink);
       background-color: var(--canvas);
-      background-image: radial-gradient(rgba(36, 74, 56, .09) .7px, transparent .7px);
-      background-size: 15px 15px;
+      background-image: linear-gradient(135deg, rgba(255,255,255,.75), transparent 44%), repeating-linear-gradient(0deg, rgba(93,156,196,.035) 0, rgba(93,156,196,.035) 1px, transparent 1px, transparent 30px), repeating-linear-gradient(90deg, rgba(93,156,196,.035) 0, rgba(93,156,196,.035) 1px, transparent 1px, transparent 30px);
     }
     button, input { font: inherit; }
-    button { cursor: pointer; }
+    button { cursor: pointer; transition: transform .18s cubic-bezier(.2,.8,.2,1), filter .18s ease, background-color .2s ease, box-shadow .2s ease; }
+    button:hover { filter: brightness(1.05); }
+    button:active { transform: scale(.94); }
+    button:focus-visible { outline: 3px solid rgba(23, 106, 159, .35); outline-offset: 2px; }
+    button.tap-feedback { animation: button-tap .32s cubic-bezier(.2,.8,.2,1); }
     .shell { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 28px 0 44px; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
-    .brand { display: flex; align-items: center; gap: 11px; min-width: 165px; }
-    .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--lime); background: var(--green); font-family: Georgia, serif; font-size: 24px; }
-    .brand-name { font-family: Georgia, serif; font-size: 22px; letter-spacing: .2px; }
-    .brand-caption { margin-top: 2px; color: var(--muted); font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; }
-    .searchbar { display: flex; align-items: center; width: min(440px, 48vw); height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 4px 14px rgba(36, 57, 43, .025); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+    .searchbar { position: relative; z-index: 30; display: flex; align-items: center; width: min(520px, calc(100% - 130px)); height: 48px; border: 1px solid rgba(255,255,255,.88); border-radius: 999px; background: rgba(255,255,255,.58); backdrop-filter: blur(22px) saturate(1.25); -webkit-backdrop-filter: blur(22px) saturate(1.25); box-shadow: 0 8px 26px rgba(42, 91, 126, .09), inset 0 1px rgba(255,255,255,.9); transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+    .searchbar:focus-within { border-color: rgba(23,106,159,.42); background: rgba(255,255,255,.78); box-shadow: 0 9px 30px rgba(42,91,126,.15), 0 0 0 4px rgba(23,106,159,.08); }
     .search-icon { padding-left: 14px; color: var(--muted); font-size: 18px; }
-    .searchbar input { flex: 1; width: 0; height: 100%; padding: 0 12px; color: var(--ink); border: 0; outline: 0; background: transparent; font-size: 14px; }
+    .searchbar input { flex: 1; min-width: 0; width: 0; height: 100%; padding: 0 12px; color: var(--ink); border: 0; outline: 0; background: transparent; font-size: 14px; }
     .searchbar input::placeholder { color: #9aa69e; }
-    .searchbar button { align-self: stretch; padding: 0 17px; border: 0; border-radius: 0 7px 7px 0; color: white; background: var(--green); font-size: 13px; font-weight: 600; }
-    .searchbar button:hover { background: var(--green-dark); }
+    .searchbar > button { align-self: stretch; margin: 4px; padding: 0 18px; border: 0; border-radius: 999px; color: white; background: var(--green); font-size: 13px; font-weight: 600; }
+    .searchbar > button:hover { background: var(--green-dark); }
+    .city-suggestions { position: absolute; top: calc(100% + 9px); right: 0; left: 0; max-height: min(390px, 60vh); overflow: auto; padding: 6px; border: 1px solid rgba(255,255,255,.9); border-radius: 18px; background: rgba(247,252,255,.88); backdrop-filter: blur(26px) saturate(1.35); -webkit-backdrop-filter: blur(26px) saturate(1.35); box-shadow: 0 18px 42px rgba(25,71,104,.18); }
+    .city-suggestions[hidden] { display: none; }
+    .suggestion { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 0; border-radius: 12px; color: var(--ink); background: transparent; text-align: left; }
+    .suggestion:hover, .suggestion[aria-selected="true"] { background: rgba(206,233,247,.72); }
+    .suggestion-name { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .suggestion-detail { flex: 0 0 auto; max-width: 48%; overflow: hidden; color: var(--muted); font-size: 11px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .suggestion-message { padding: 13px; color: var(--muted); font-size: 13px; }
     .top-actions { display: flex; align-items: center; gap: 12px; }
-    .unit-switch { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
+    .unit-switch { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
     .unit-switch button { min-width: 38px; height: 31px; border: 0; border-radius: 5px; color: var(--muted); background: transparent; font-size: 13px; }
     .unit-switch button[aria-pressed="true"] { color: white; background: var(--green); }
-    .location-button { width: 39px; height: 39px; border: 1px solid var(--line); border-radius: 7px; color: var(--green); background: var(--paper); font-size: 18px; }
+    .location-button { width: 39px; height: 39px; border: 1px solid var(--line); border-radius: 7px; color: var(--green); background: var(--paper); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); font-size: 18px; }
     .location-button:hover { border-color: var(--green); }
     .eyebrow { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 1.35px; text-transform: uppercase; }
     .dashboard-heading { display: flex; align-items: end; justify-content: space-between; margin: 25px 0 14px; }
     .dashboard-heading h1 { margin: 5px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 400; }
+    .dashboard-heading h1, .place h2, .temperature, .metric-value, .hour-temp { font-family: inherit; letter-spacing: 0; }
     .updated { color: var(--muted); font-size: 12px; }
+    .map-panel { position: relative; height: 390px; overflow: hidden; border: 1px solid rgba(255,255,255,.9); border-radius: 12px; background: #cde8f5; box-shadow: var(--shadow); isolation: isolate; }
+    #city-map { position: absolute; inset: 0; z-index: 0; }
+    .map-tag { position: absolute; z-index: 500; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid rgba(255,255,255,.75); border-radius: 8px; color: var(--ink); background: rgba(255,255,255,.76); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 6px 18px rgba(24,73,108,.1); font-size: 12px; font-weight: 650; }
+    .map-tag span:first-child { color: var(--green); font-size: 16px; }
+    .map-overlay { position: absolute; z-index: 500; bottom: 17px; left: 17px; width: min(310px, calc(100% - 78px)); padding: 16px 18px; border: 1px solid rgba(255,255,255,.78); border-radius: 9px; color: var(--ink); background: rgba(249,253,255,.77); backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3); box-shadow: 0 9px 24px rgba(23,66,96,.13); }
+    .map-overlay-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .map-overlay-place { overflow: hidden; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .map-live { display: flex; align-items: center; gap: 5px; color: #42816c; font-size: 10px; }
+    .map-live::before { width: 6px; height: 6px; border-radius: 50%; background: #56b48c; content: ""; }
+    .map-overlay-bottom { display: flex; align-items: baseline; gap: 9px; margin-top: 7px; }
+    .map-temp { font-size: 25px; font-weight: 550; }
+    .map-condition { color: var(--muted); font-size: 12px; }
+    .leaflet-container { font: inherit; }
+    .leaflet-control-zoom { overflow: hidden; border: 1px solid rgba(255,255,255,.8) !important; border-radius: 8px !important; box-shadow: 0 5px 16px rgba(23,66,96,.16) !important; }
+    .leaflet-control-zoom a { color: var(--ink) !important; background: rgba(255,255,255,.8) !important; backdrop-filter: blur(14px); }
+    .leaflet-control-attribution { background: rgba(255,255,255,.68) !important; backdrop-filter: blur(8px); }
+    .leaflet-tooltip.city-tooltip { padding: 5px 9px; border: 1px solid rgba(255,255,255,.8); border-radius: 6px; color: var(--ink); background: rgba(255,255,255,.82); box-shadow: 0 4px 14px rgba(24,73,108,.12); font-weight: 650; }
+    .leaflet-tooltip.city-tooltip::before { display: none; }
     .overview { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, .85fr); gap: 14px; }
-    .current-card { position: relative; display: flex; min-height: 286px; overflow: hidden; padding: 27px 30px; border-radius: 10px; color: white; background: var(--green); box-shadow: var(--shadow); }
+    .current-card { position: relative; display: flex; min-height: 286px; overflow: hidden; padding: 27px 30px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: white; background: linear-gradient(135deg, #14618f, #174b74); box-shadow: var(--shadow); }
     .current-card::after { position: absolute; right: -52px; bottom: -112px; width: 310px; height: 310px; border: 1px solid rgba(217, 239, 138, .18); border-radius: 50%; content: ""; box-shadow: 0 0 0 29px rgba(217, 239, 138, .035), 0 0 0 62px rgba(217, 239, 138, .025); }
     .current-info { position: relative; z-index: 1; display: flex; flex: 1; flex-direction: column; justify-content: space-between; }
     .current-card .eyebrow { color: #c0d0c4; }
@@ -71,17 +98,17 @@
     .sun-summary { display: flex; gap: 24px; color: #e6eee8; font-size: 12px; }
     .sun-summary b { margin-right: 5px; color: var(--lime); font-weight: 600; }
     .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-    .metric { display: flex; flex-direction: column; justify-content: space-between; min-height: 136px; padding: 19px 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 8px 22px rgba(36, 57, 43, .025); }
+    .metric { display: flex; flex-direction: column; justify-content: space-between; min-height: 136px; padding: 19px 20px; border: 1px solid rgba(255,255,255,.9); border-radius: 9px; background: var(--paper); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 22px rgba(36, 57, 43, .045); }
     .metric-top { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
     .metric-symbol { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 8px; color: var(--green); background: #edf2e7; font-size: 16px; }
     .metric-value { margin-top: 13px; font-family: Georgia, serif; font-size: 30px; }
     .metric-note { margin-top: 2px; color: var(--muted); font-size: 11px; }
-    .section { margin-top: 19px; padding: 21px 23px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 8px 22px rgba(36, 57, 43, .025); }
+    .section { margin-top: 19px; padding: 21px 23px; border: 1px solid rgba(255,255,255,.86); border-radius: 9px; background: var(--paper); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 22px rgba(36, 57, 43, .04); }
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
     .section-heading h2 { margin: 0; font-family: Georgia, serif; font-size: 19px; font-weight: 400; }
     .section-heading span { color: var(--muted); font-size: 12px; }
     .hourly-list { display: grid; grid-auto-columns: minmax(74px, 1fr); grid-auto-flow: column; gap: 9px; overflow-x: auto; padding: 1px 0 5px; scrollbar-color: #c9d5c9 transparent; scrollbar-width: thin; }
-    .hour { display: flex; min-height: 112px; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 6px; border-radius: 7px; background: #f4f6f1; }
+    .hour { display: flex; min-height: 112px; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 6px; border-radius: 7px; background: rgba(225, 240, 248, .7); }
     .hour:first-child { color: white; background: var(--green); }
     .hour-time { font-size: 11px; opacity: .78; }
     .hour-icon { color: var(--orange); font-size: 20px; line-height: 1; }
@@ -103,16 +130,22 @@
     .status { min-height: 18px; color: var(--muted); font-size: 12px; }
     .status.error { color: #aa493d; }
     .status.loading { color: var(--green); }
+    .status.loading { animation: status-pulse 1s ease-in-out infinite; }
     .skeleton { color: transparent !important; border-radius: 4px; background: linear-gradient(90deg, #e8ede6 25%, #f4f6f1 50%, #e8ede6 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite linear; }
     .current-card .skeleton { background: linear-gradient(90deg, rgba(255,255,255,.11) 25%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.11) 75%); background-size: 200% 100%; }
     @keyframes shimmer { to { background-position: -200% 0; } }
+    @keyframes button-tap { 0% { transform: scale(.94); } 58% { transform: scale(1.035); } 100% { transform: scale(1); } }
+    @keyframes status-pulse { 50% { opacity: .48; } }
+    .leaflet-control-zoom a { transition: transform .18s ease, background-color .18s ease; }
+    .leaflet-control-zoom a:active { transform: scale(.9); }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
     @media (max-width: 760px) {
       .shell { width: min(100% - 30px, 600px); padding-top: 18px; }
+      .map-panel { height: 310px; }
       .topbar { flex-wrap: wrap; gap: 14px; margin-bottom: 21px; }
-      .brand { flex: 1; }
-      .searchbar { order: 3; width: 100%; }
-      .top-actions { gap: 8px; }
+      .searchbar { order: 0; width: 100%; flex: 1 0 100%; }
+      .searchbar input { font-size: 16px; }
+      .top-actions { order: 1; gap: 8px; margin-left: auto; }
       .overview { grid-template-columns: 1fr; }
       .current-card { min-height: 260px; padding: 22px; }
       .metric-grid { gap: 10px; }
@@ -140,14 +173,11 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand" aria-label="Langit, monitoring cuaca">
-        <div class="brand-mark" aria-hidden="true">L</div>
-        <div><div class="brand-name">langit</div><div class="brand-caption">monitoring cuaca</div></div>
-      </div>
       <form class="searchbar" id="search-form" role="search">
         <span class="search-icon" aria-hidden="true">⌕</span>
-        <input id="city-input" type="search" placeholder="Cari kota, mis. Bandung" aria-label="Cari nama kota" autocomplete="off">
+        <input id="city-input" type="search" placeholder="Cari kota atau wilayah" aria-label="Cari nama kota" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="city-suggestions" aria-expanded="false">
         <button type="submit">Cari kota</button>
+        <div class="city-suggestions" id="city-suggestions" role="listbox" aria-label="Saran kota" hidden></div>
       </form>
       <div class="top-actions">
         <div class="unit-switch" aria-label="Satuan suhu">
@@ -159,10 +189,19 @@
     </header>
 
     <div class="dashboard-heading">
-      <div><div class="eyebrow">Ringkasan cuaca</div><h1>Langit hari ini</h1></div>
+      <div><div class="eyebrow">Ringkasan cuaca</div><h1>Cuaca hari ini</h1></div>
       <div class="updated" id="updated-at">Mengambil data terbaru...</div>
     </div>
     <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <section class="map-panel" aria-label="Peta interaktif lokasi yang dipantau">
+      <div id="city-map" role="application" aria-label="Peta kota dengan kontrol zoom dan geser"></div>
+      <div class="map-tag"><span aria-hidden="true">⌖</span><span>PETA KOTA</span></div>
+      <div class="map-overlay" aria-live="polite">
+        <div class="map-overlay-top"><span class="map-overlay-place" id="map-place">Jakarta</span><span class="map-live">DIPANTAU</span></div>
+        <div class="map-overlay-bottom"><span class="map-temp" id="map-temp">--°</span><span class="map-condition" id="map-condition">Memuat cuaca</span></div>
+      </div>
+    </section>
 
     <section class="overview" aria-label="Cuaca saat ini">
       <article class="current-card">
@@ -203,6 +242,7 @@
     <footer class="footer"><span>Data cuaca oleh Open-Meteo</span><span id="timezone-label">Waktu lokal</span></footer>
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     const weatherDescriptions = {
       0: ["Cerah", "☀"], 1: ["Cerah berawan", "◐"], 2: ["Berawan sebagian", "◒"], 3: ["Berawan", "☁"],
@@ -212,8 +252,11 @@
       77: ["Butiran salju", "❄"], 80: ["Hujan lokal", "☂"], 81: ["Hujan lokal", "☂"], 82: ["Hujan lebat lokal", "☂"],
       85: ["Salju lokal", "❄"], 86: ["Salju lebat lokal", "❄"], 95: ["Badai petir", "ϟ"], 96: ["Badai petir & hujan es", "ϟ"], 99: ["Badai petir & hujan es", "ϟ"]
     };
-    const state = { latitude: -6.2088, longitude: 106.8456, name: "Jakarta", country: "Indonesia", temperatureUnit: "celsius", windUnit: "kmh", forecast: null };
+    const cityKeywords = ["Aceh", "Ambon", "Ambarawa", "Atambua", "Balikpapan", "Bandung", "Banda Aceh", "Banjarbaru", "Banjarmasin", "Batam", "Bekasi", "Bengkulu", "Bogor", "Cilegon", "Cimahi", "Cirebon", "Denpasar", "Depok", "Dumai", "Garut", "Gorontalo", "Jakarta", "Jambi", "Jayapura", "Kediri", "Kendari", "Kupang", "Makassar", "Malang", "Manado", "Mataram", "Medan", "Metro", "Mojokerto", "Padang", "Padang Panjang", "Padang Sidempuan", "Pagar Alam", "Pacitan", "Palangka Raya", "Palembang", "Palopo", "Palu", "Pamekasan", "Pangkal Pinang", "Parepare", "Pariaman", "Pasuruan", "Pati", "Payakumbuh", "Pekalongan", "Pekanbaru", "Pemalang", "Pematangsiantar", "Pontianak", "Prabumulih", "Probolinggo", "Purbalingga", "Purwakarta", "Purwokerto", "Purworejo", "Samarinda", "Semarang", "Sukabumi", "Surabaya", "Surakarta", "Tangerang", "Tasikmalaya", "Ternate", "Wonosobo", "Yogyakarta"];
+    const state = { latitude: -6.2088, longitude: 106.8456, name: "Jakarta", country: "Indonesia", temperatureUnit: "celsius", windUnit: "kmh", forecast: null, suggestions: [], activeSuggestion: -1, searchSequence: 0, searchTimer: null, searchController: null };
     const $ = (selector) => document.querySelector(selector);
+    let map;
+    let cityMarker;
     const round = (value) => Math.round(Number(value));
     const describe = (code) => weatherDescriptions[code] || ["Kondisi tidak diketahui", "·"];
     const temp = (value) => `${round(state.temperatureUnit === "fahrenheit" ? value * 9 / 5 + 32 : value)}°`;
@@ -222,15 +265,130 @@
     const dayName = (value, index) => index === 0 ? "Hari ini" : index === 1 ? "Besok" : new Intl.DateTimeFormat("id-ID", { weekday: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
     const setStatus = (message = "", kind = "") => { const el = $("#status"); el.textContent = message; el.className = `status ${kind}`; };
 
-    async function findCity(query) {
+    async function findCity(query, countryCode) {
       const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
-      url.search = new URLSearchParams({ name: query, count: "1", language: "id", format: "json" });
+      const params = new URLSearchParams({ name: query, count: "1", language: "id", format: "json" });
+      if (countryCode) params.set("countryCode", countryCode);
+      url.search = params;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Layanan pencarian kota sedang tidak tersedia.");
       const result = await response.json();
       if (!result.results?.length) throw new Error(`Kota “${query}” tidak ditemukan. Coba nama kota lain.`);
       return result.results[0];
     }
+
+    function showSuggestions(results, query) {
+      const list = $("#city-suggestions");
+      state.suggestions = results;
+      state.activeSuggestion = -1;
+      list.replaceChildren();
+      if (!results.length) {
+        const message = document.createElement("div");
+        message.className = "suggestion-message";
+        message.textContent = query.length === 1 ? "Belum ada wilayah untuk huruf ini." : "Wilayah tidak ditemukan. Coba nama yang lebih lengkap.";
+        list.append(message);
+      } else {
+        results.forEach((place, index) => {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.className = "suggestion";
+          option.id = `city-option-${index}`;
+          option.setAttribute("role", "option");
+          option.setAttribute("aria-selected", "false");
+          const name = document.createElement("span");
+          name.className = "suggestion-name";
+          name.textContent = place.name;
+          const detail = document.createElement("span");
+          detail.className = "suggestion-detail";
+          detail.textContent = [place.admin1, place.country].filter(Boolean).join(", ") || "Pilih wilayah";
+          option.append(name, detail);
+          option.addEventListener("click", () => selectCity(place));
+          list.append(option);
+        });
+      }
+      list.hidden = false;
+      $("#city-input").setAttribute("aria-expanded", "true");
+    }
+
+    function closeSuggestions() {
+      $("#city-suggestions").hidden = true;
+      $("#city-input").setAttribute("aria-expanded", "false");
+      $("#city-input").removeAttribute("aria-activedescendant");
+      state.activeSuggestion = -1;
+      state.suggestions = [];
+    }
+
+    async function selectCity(place) {
+      clearTimeout(state.searchTimer);
+      state.searchController?.abort();
+      closeSuggestions();
+      $("#city-input").value = place.name;
+      setStatus("Membuka wilayah...", "loading");
+      try {
+        const result = place.latitude !== undefined ? place : await findCity(place.name, place.country_code);
+        state.latitude = result.latitude;
+        state.longitude = result.longitude;
+        state.name = result.name;
+        state.admin = result.admin1;
+        state.country = result.country;
+        localStorage.setItem("langit-location", JSON.stringify({ latitude: state.latitude, longitude: state.longitude, name: state.name, admin: state.admin, country: state.country }));
+        await loadWeather();
+      } catch (error) { setStatus(error.message, "error"); }
+    }
+
+    function updateActiveSuggestion(index) {
+      const options = $("#city-suggestions").querySelectorAll('[role="option"]');
+      if (!options.length) return;
+      state.activeSuggestion = (index + options.length) % options.length;
+      options.forEach((option, optionIndex) => option.setAttribute("aria-selected", String(optionIndex === state.activeSuggestion)));
+      const active = options[state.activeSuggestion];
+      $("#city-input").setAttribute("aria-activedescendant", active.id);
+      active.scrollIntoView({ block: "nearest" });
+    }
+
+    $("#city-input").addEventListener("input", () => {
+      clearTimeout(state.searchTimer);
+      state.searchController?.abort();
+      const query = $("#city-input").value.trim();
+      const sequence = ++state.searchSequence;
+      if (!query) { closeSuggestions(); state.suggestions = []; return; }
+      const localResults = cityKeywords.filter((name) => name.toLocaleLowerCase("id").startsWith(query.toLocaleLowerCase("id"))).map((name) => ({ name, country: "Indonesia", country_code: "ID" }));
+      if (query.length === 1) {
+        showSuggestions(localResults.slice(0, 24), query);
+        return;
+      }
+      showSuggestions(localResults.slice(0, 12), query);
+      if (!localResults.length) $("#city-suggestions .suggestion-message").textContent = "Mencari wilayah...";
+      state.searchTimer = setTimeout(async () => {
+        const controller = new AbortController();
+        state.searchController = controller;
+        try {
+          const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+          url.search = new URLSearchParams({ name: query, count: "10", language: "id", format: "json" });
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) throw new Error("Layanan pencarian wilayah tidak tersedia.");
+          const result = await response.json();
+          if (sequence === state.searchSequence) {
+            const matches = result.results || [];
+            const prioritized = localResults.length ? matches.filter((place) => place.name.toLocaleLowerCase("id").startsWith(query.toLocaleLowerCase("id"))) : matches;
+            const combined = [...localResults, ...prioritized];
+            const unique = combined.filter((place, index) => combined.findIndex((item) => item.name.toLocaleLowerCase("id") === place.name.toLocaleLowerCase("id") && item.country === place.country) === index);
+            showSuggestions(unique.slice(0, 12), query);
+          }
+        } catch (error) {
+          if (error.name !== "AbortError" && sequence === state.searchSequence) showSuggestions([], query);
+        }
+      }, 220);
+    });
+
+    $("#city-input").addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" && !$("#city-suggestions").hidden) { event.preventDefault(); updateActiveSuggestion(state.activeSuggestion + 1); }
+      if (event.key === "ArrowUp" && !$("#city-suggestions").hidden) { event.preventDefault(); updateActiveSuggestion(state.activeSuggestion < 0 ? state.suggestions.length - 1 : state.activeSuggestion - 1); }
+      if (event.key === "Escape") closeSuggestions();
+    });
+    document.addEventListener("click", (event) => {
+      if (!$("#search-form").contains(event.target)) closeSuggestions();
+    });
 
     async function loadWeather() {
       const place = $("#place-name");
@@ -242,12 +400,13 @@
           current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m",
           hourly: "temperature_2m,precipitation_probability,weather_code",
           daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,uv_index_max",
-          forecast_days: "7", temperature_unit: state.temperatureUnit, wind_speed_unit: state.windUnit
+          forecast_days: "7", temperature_unit: "celsius", wind_speed_unit: state.windUnit
         });
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
         if (!response.ok) throw new Error("Data cuaca tidak berhasil dimuat. Periksa koneksi lalu coba lagi.");
         state.forecast = await response.json();
         renderWeather();
+        updateMapLocation();
         setStatus("");
       } catch (error) {
         setStatus(error.message || "Terjadi kendala saat memuat data cuaca.", "error");
@@ -266,6 +425,9 @@
       $("#current-temp").classList.remove("skeleton");
       $("#current-icon").textContent = icon;
       $("#current-condition").textContent = condition;
+      $("#map-place").textContent = state.name;
+      $("#map-temp").textContent = temp(current.temperature_2m);
+      $("#map-condition").textContent = condition;
       $("#feels-like").textContent = `Terasa seperti ${temp(current.apparent_temperature)}`;
       $("#humidity").textContent = `${round(current.relative_humidity_2m)}%`;
       $("#wind").textContent = windValue(current.wind_speed_10m);
@@ -285,6 +447,24 @@
 
     function compass(degrees) {
       return ["Utara", "Timur Laut", "Timur", "Tenggara", "Selatan", "Barat Daya", "Barat", "Barat Laut"][Math.round(degrees / 45) % 8];
+    }
+    function initializeMap() {
+      if (!window.L) {
+        $("#city-map").innerHTML = '<div style="display:grid;height:100%;place-items:center;padding:24px;color:#315b78;text-align:center">Peta tidak dapat dimuat. Periksa koneksi internet untuk menampilkan peta kota.</div>';
+        return;
+      }
+      map = L.map("city-map", { zoomControl: false, scrollWheelZoom: false }).setView([state.latitude, state.longitude], 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      cityMarker = L.circleMarker([state.latitude, state.longitude], { radius: 9, color: "#fff", weight: 4, fillColor: "#1584c1", fillOpacity: 1 }).addTo(map);
+      cityMarker.bindTooltip(state.name, { permanent: true, direction: "top", offset: [0, -8], className: "city-tooltip" }).openTooltip();
+    }
+    function updateMapLocation() {
+      if (!map || !cityMarker) return;
+      const coordinates = [state.latitude, state.longitude];
+      cityMarker.setLatLng(coordinates).setTooltipContent(state.name);
+      const center = map.getCenter();
+      if (Math.abs(center.lat - state.latitude) > .015 || Math.abs(center.lng - state.longitude) > .015) map.flyTo(coordinates, 12, { duration: .8 });
     }
     function uvDescription(value) { return value < 3 ? "Rendah" : value < 6 ? "Sedang" : value < 8 ? "Tinggi" : value < 11 ? "Sangat tinggi" : "Ekstrem"; }
     function renderHourly(hourly, now) {
@@ -309,21 +489,26 @@
       }).join("");
     }
 
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      button.classList.remove("tap-feedback");
+      void button.offsetWidth;
+      button.classList.add("tap-feedback");
+    });
+    document.addEventListener("animationend", (event) => {
+      if (event.animationName === "button-tap") event.target.classList.remove("tap-feedback");
+    });
+
     $("#search-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const query = $("#city-input").value.trim();
       if (!query) { $("#city-input").focus(); return; }
-      setStatus("Mencari lokasi...", "loading");
-      try {
-        const result = await findCity(query);
-        state.latitude = result.latitude;
-        state.longitude = result.longitude;
-        state.name = result.name;
-        state.admin = result.admin1;
-        state.country = result.country;
-        localStorage.setItem("langit-location", JSON.stringify({ latitude: state.latitude, longitude: state.longitude, name: state.name, admin: state.admin, country: state.country }));
-        await loadWeather();
-      } catch (error) { setStatus(error.message, "error"); }
+      const selected = state.suggestions[state.activeSuggestion] || (query.length === 1 ? state.suggestions[0] : null);
+      if (selected) { await selectCity(selected); return; }
+      if (query.length === 1) { setStatus("Pilih wilayah dari daftar saran.", "error"); return; }
+      try { await selectCity(await findCity(query)); }
+      catch (error) { setStatus(error.message, "error"); }
     });
     document.querySelectorAll("[data-unit]").forEach((button) => button.addEventListener("click", () => {
       state.temperatureUnit = button.dataset.unit;
@@ -347,6 +532,8 @@
       const saved = JSON.parse(localStorage.getItem("langit-location"));
       if (saved && Number.isFinite(saved.latitude) && Number.isFinite(saved.longitude)) Object.assign(state, saved);
     } catch { /* Prefer the default city when local storage is unavailable. */ }
+    $("#map-place").textContent = state.name;
+    initializeMap();
     loadWeather();
   </script>
 </body>
